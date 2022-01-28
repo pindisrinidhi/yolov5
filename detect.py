@@ -32,12 +32,14 @@ from pathlib import Path
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
+import pytesseract
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+pytesseract.pytesseract.tesseract_cmd = '/usr/local/bin/tesseract'
 
 from models.common import DetectMultiBackend
 from utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
@@ -83,6 +85,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     if is_url and is_file:
         source = check_file(source)  # download
 
+    save_crop = True
     # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
@@ -173,7 +176,14 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
                         annotator.box_label(xyxy, label, color=colors(c, True))
                         if save_crop:
-                            save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                            filename = save_dir / 'crops' / f'{p.stem}' / f'{names[c]}.jpg'
+                            incremented_path = save_one_box(xyxy, imc, file=filename, BGR=True)
+                            img_walmart = cv2.imread(str(incremented_path))
+                            text_walmart = pytesseract.image_to_string(img_walmart, config='--psm 3')
+                            text_file = save_dir / 'crops' / f'{p.stem}' / f'{p.stem}.txt'
+                            with open(text_file, 'a') as f:
+                                f.write('{}: {}\n'.format(names[c], text_walmart))
+
 
             # Print time (inference-only)
             LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
